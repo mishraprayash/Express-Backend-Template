@@ -1,6 +1,7 @@
 import app from './app';
 import { config } from './config';
 import { ConnectionManager } from './shared/utils/connectionManager';
+import { SignalHandler } from './shared/utils/signalHandler';
 
 const startServer = async () => {
   try {
@@ -14,50 +15,9 @@ const startServer = async () => {
       console.log(`Server is running on port ${config.port} in ${config.env} mode`);
     });
 
-    // Handle server errors
-    server.on('error', async (error: Error) => {
-      console.error('Server Error:', error);
-      await connectionManager.cleanup();
-      process.exit(1);
-    });
+    // Setup signal handlers
+    SignalHandler.setup(server, connectionManager);
 
-    // Handle unhandled rejections
-    process.on('unhandledRejection', async (reason: Error) => {
-      console.error('Unhandled Rejection:', reason);
-      server.close(async () => {
-        await connectionManager.cleanup();
-        process.exit(1);
-      });
-    });
-
-    // Handle uncaught exceptions
-    process.on('uncaughtException', async (error: Error) => {
-      console.error('Uncaught Exception:', error);
-      server.close(async () => {
-        await connectionManager.cleanup();
-        process.exit(1);
-      });
-    });
-
-    const gracefulShutdown = async () => {
-      console.log('Shutting down gracefully...');
-      server.close(async () => {
-        await connectionManager.cleanup();
-        console.log('Server closed');
-        process.exit(0);
-      });
-
-      // Force shutdown after 10 seconds
-      setTimeout(async () => {
-        console.error('Could not close connections in time, forcefully shutting down');
-        await connectionManager.cleanup();
-        process.exit(1);
-      }, 10000);
-    };
-
-    // Handle process termination
-    process.on('SIGTERM', gracefulShutdown);
-    process.on('SIGINT', gracefulShutdown);
   } catch (error) {
     console.error('Failed to start server:', error);
     process.exit(1);
