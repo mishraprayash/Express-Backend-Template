@@ -1,19 +1,30 @@
 export enum ErrorType {
-  VALIDATION = 'VALIDATION_ERROR',
-  AUTHENTICATION = 'AUTHENTICATION_ERROR',
-  AUTHORIZATION = 'AUTHORIZATION_ERROR',
-  NOT_FOUND = 'NOT_FOUND_ERROR',
-  CONFLICT = 'CONFLICT_ERROR',
-  INTERNAL = 'INTERNAL_SERVER_ERROR',
+  VALIDATION = 'VALIDATION',
+  AUTHENTICATION = 'AUTHENTICATION',
+  AUTHORIZATION = 'AUTHORIZATION',
+  NOT_FOUND = 'NOT_FOUND',
+  CONFLICT = 'CONFLICT',
+  INTERNAL = 'INTERNAL',
+  EXTERNAL = 'EXTERNAL_ERROR',
+  DATABASE = 'DATABASE',
+  EMAIL = 'EMAIL_ERROR',
+  REDIS = 'REDIS_ERROR',
+  TOO_MANY_REQUESTS = 'TOO_MANY_REQUESTS',
+  SECURITY = 'SECURITY_ERROR',
+  INJECTION = 'INJECTION_ERROR',
+  SSRF = 'SSRF_ERROR',
+  CSRF = 'CSRF_ERROR',
 }
 
 export enum ErrorModule {
-  USER = 'USER_MODULE',
-  AUTH = 'AUTH_MODULE',
-  DATABASE = 'DATABASE_MODULE',
-  VALIDATION = 'VALIDATION_MODULE',
-  SYSTEM = 'SYSTEM_MODULE',
-  CACHE = 'CACHE_MODULE',
+  USER = 'USER',
+  AUTH = 'AUTH',
+  DATABASE = 'DATABASE',
+  VALIDATION = 'VALIDATION',
+  SYSTEM = 'SYSTEM',
+  EMAIL = 'EMAIL',
+  REDIS = 'REDIS',
+  SECURITY = 'SECURITY',
 }
 
 export interface ErrorSource {
@@ -31,9 +42,9 @@ export interface ErrorResponse {
   details?: Record<string, unknown>;
 }
 
-type ErrorMessagesType = {
-  [K in ErrorModule]: {
-    [T in ErrorType]?: {
+export type ErrorMessagesType = {
+  [key in ErrorModule]: {
+    [key in ErrorType]?: {
       [key: string]: string;
     };
   };
@@ -41,64 +52,145 @@ type ErrorMessagesType = {
 
 export const ErrorMessages: ErrorMessagesType = {
   [ErrorModule.USER]: {
-    [ErrorType.NOT_FOUND]: {
-      USER_NOT_FOUND: 'User not found',
-    },
     [ErrorType.VALIDATION]: {
-      INVALID_EMAIL: 'Please provide a valid email',
-      INVALID_PASSWORD: 'Password must be at least 6 characters long',
-    },
-    [ErrorType.CONFLICT]: {
+      INVALID_INPUT: 'Invalid user input',
       DUPLICATE_EMAIL: 'Email already exists',
     },
-  },
-  [ErrorModule.AUTH]: {
     [ErrorType.AUTHENTICATION]: {
-      INVALID_TOKEN: 'Invalid token. Please log in again',
-      TOKEN_EXPIRED: 'Token expired. Please log in again',
-      INVALID_CREDENTIALS: 'Invalid credentials',
+      INVALID_CREDENTIALS: 'Invalid email or password',
     },
     [ErrorType.AUTHORIZATION]: {
       UNAUTHORIZED: 'You are not authorized to perform this action',
-      FORBIDDEN: 'Access forbidden',
+    },
+    [ErrorType.NOT_FOUND]: {
+      USER_NOT_FOUND: 'User not found',
+    },
+    [ErrorType.CONFLICT]: {
+      USER_EXISTS: 'User with this email already exists',
+    },
+    [ErrorType.INTERNAL]: {
+      CREATE_ERROR: 'Error creating user',
+      UPDATE_ERROR: 'Error updating user',
+      DELETE_ERROR: 'Error deleting user',
+      QUERY_ERROR: 'Error querying user',
+      PASSWORD_HASH_ERROR: 'Error hashing password',
+      PASSWORD_COMPARE_ERROR: 'Error comparing passwords',
+    },
+  },
+  [ErrorModule.AUTH]: {
+    [ErrorType.VALIDATION]: {
+      INVALID_INPUT: 'Invalid authentication input',
+    },
+    [ErrorType.AUTHENTICATION]: {
+      NO_TOKEN: 'No authentication token provided',
+      INVALID_TOKEN: 'Invalid authentication token',
+      TOKEN_EXPIRED: 'Authentication token has expired',
+      INVALID_CREDENTIALS: 'Invalid email or password',
+    },
+    [ErrorType.AUTHORIZATION]: {
+      UNAUTHORIZED: 'You are not authorized to perform this action',
+    },
+    [ErrorType.NOT_FOUND]: {
+      USER_NOT_FOUND: 'User not found',
+    },
+    [ErrorType.CONFLICT]: {
+      USER_EXISTS: 'User with this email already exists',
+    },
+    [ErrorType.INTERNAL]: {
+      LOGIN_ERROR: 'Error during login',
+      TOKEN_GENERATION_ERROR: 'Error generating authentication token',
     },
   },
   [ErrorModule.DATABASE]: {
-    [ErrorType.INTERNAL]: {
-      CONNECTION_ERROR: 'Database connection failed',
-      QUERY_ERROR: 'Database query failed',
-    },
     [ErrorType.VALIDATION]: {
+      INVALID_INPUT: 'Invalid database input',
       INVALID_DATA: 'Invalid data format',
+    },
+    [ErrorType.AUTHENTICATION]: {
+      INVALID_CREDENTIALS: 'Invalid database credentials',
+    },
+    [ErrorType.AUTHORIZATION]: {
+      UNAUTHORIZED: 'You are not authorized to access the database',
     },
     [ErrorType.NOT_FOUND]: {
       RESOURCE_NOT_FOUND: 'Resource not found',
+      RECORD_NOT_FOUND: 'Record not found',
+    },
+    [ErrorType.CONFLICT]: {
+      DUPLICATE_KEY: 'Duplicate key error',
+      DUPLICATE_EMAIL: 'Email already exists',
+    },
+    [ErrorType.INTERNAL]: {
+      QUERY_ERROR: 'Database query error',
+      CONNECTION_ERROR: 'Database connection error',
+      DISCONNECTION_FAILED: 'Failed to disconnect from database',
     },
   },
   [ErrorModule.VALIDATION]: {
     [ErrorType.VALIDATION]: {
       INVALID_INPUT: 'Invalid input data',
-      MISSING_FIELDS: 'Required fields are missing',
+    },
+    [ErrorType.AUTHENTICATION]: {
+      INVALID_CREDENTIALS: 'Invalid credentials',
+    },
+    [ErrorType.AUTHORIZATION]: {
+      UNAUTHORIZED: 'You are not authorized to perform this action',
+    },
+    [ErrorType.NOT_FOUND]: {
+      NOT_FOUND: 'Resource not found',
+    },
+    [ErrorType.CONFLICT]: {
+      CONFLICT: 'Resource conflict',
+    },
+    [ErrorType.INTERNAL]: {
+      INTERNAL_ERROR: 'Internal validation error',
     },
   },
   [ErrorModule.SYSTEM]: {
-    [ErrorType.INTERNAL]: {
-      SERVER_ERROR: 'Something went wrong',
-      UNKNOWN_ERROR: 'An unknown error occurred',
-    },
-    [ErrorType.AUTHORIZATION]: {
-      RATE_LIMIT_EXCEEDED: 'Too many requests, please try again later',
-    },
     [ErrorType.VALIDATION]: {
+      INVALID_INPUT: 'Invalid input data',
       INVALID_CONFIG: 'Invalid configuration',
     },
-  },
-  [ErrorModule.CACHE]: {
     [ErrorType.INTERNAL]: {
-      SET_ERROR: 'Failed to set cache value',
-      GET_ERROR: 'Failed to get cache value',
-      DELETE_ERROR: 'Failed to delete cache value',
-      FLUSH_ERROR: 'Failed to flush cache',
+      SERVER_ERROR: 'Internal server error',
+    },
+    [ErrorType.TOO_MANY_REQUESTS]: {
+      RATE_LIMIT_EXCEEDED: 'Too many requests, please try again later',
+    },
+  },
+  [ErrorModule.EMAIL]: {
+    [ErrorType.EMAIL]: {
+      SEND_ERROR: 'Error sending email',
+      TEMPLATE_ERROR: 'Error with email template',
+    },
+  },
+  [ErrorModule.REDIS]: {
+    [ErrorType.REDIS]: {
+      CONNECTION_ERROR: 'Redis connection error',
+      OPERATION_ERROR: 'Redis operation error',
+    },
+  },
+  [ErrorModule.SECURITY]: {
+    [ErrorType.SECURITY]: {
+      INVALID_URL: 'Invalid URL detected',
+      INJECTION_DETECTED: 'Injection attempt detected',
+      SSRF_DETECTED: 'SSRF attempt detected',
+      PROTOTYPE_POLLUTION: 'Prototype pollution detected',
+    },
+    [ErrorType.INJECTION]: {
+      SQL_INJECTION: 'SQL injection attempt detected',
+      NOSQL_INJECTION: 'NoSQL injection attempt detected',
+      COMMAND_INJECTION: 'Command injection attempt detected',
+    },
+    [ErrorType.SSRF]: {
+      INVALID_URL_PARAM: 'Invalid URL parameter',
+      INVALID_QUERY_URL: 'Invalid URL in query parameter',
+      INVALID_BODY_URL: 'Invalid URL in request body',
+    },
+    [ErrorType.CSRF]: {
+      TOKEN_MISSING: 'CSRF token missing',
+      TOKEN_INVALID: 'Invalid CSRF token',
+      TOKEN_EXPIRED: 'CSRF token expired',
     },
   },
 };

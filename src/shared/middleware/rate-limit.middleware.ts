@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import rateLimit from 'express-rate-limit';
 import { AppError } from '../errors/AppError';
 import { ErrorType, ErrorModule, ErrorMessages } from '../errors/errorTypes';
+import { HTTP_STATUS } from '../constants/httpStatus';
 
 export const createRateLimiter = (options: {
   windowMs?: number;
@@ -16,11 +17,11 @@ export const createRateLimiter = (options: {
     handler: (req: Request, res: Response, next: NextFunction) => {
       try {
         throw new AppError(
-          ErrorType.AUTHORIZATION,
+          ErrorType.TOO_MANY_REQUESTS,
           ErrorModule.SYSTEM,
           message ||
-            ErrorMessages[ErrorModule.SYSTEM][ErrorType.AUTHORIZATION]!.RATE_LIMIT_EXCEEDED,
-          429,
+            ErrorMessages[ErrorModule.SYSTEM][ErrorType.TOO_MANY_REQUESTS]!.RATE_LIMIT_EXCEEDED,
+          HTTP_STATUS.TOO_MANY_REQUESTS,
           { module: ErrorModule.SYSTEM, method: 'rateLimit' },
           {
             retryAfter: Math.ceil(windowMs / 1000),

@@ -2,7 +2,15 @@ import { Request, Response, NextFunction } from 'express';
 import { UserService } from '../services/user.service';
 import { AppError } from '../../../shared/errors/AppError';
 import { ErrorType, ErrorModule, ErrorMessages } from '../../../shared/errors/errorTypes';
-import { AuthenticatedRequest } from '../../../shared/types/express';
+import { HTTP_STATUS } from '../../../shared/constants/httpStatus';
+
+interface AuthenticatedRequest extends Request {
+  user?: {
+    id: string;
+    email: string;
+    role: string;
+  };
+}
 
 export class UserController {
   private userService: UserService;
@@ -14,16 +22,9 @@ export class UserController {
   register = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const user = await this.userService.createUser(req.body);
-      res.status(201).json({
+      res.status(HTTP_STATUS.CREATED).json({
         status: 'success',
-        data: {
-          user: {
-            id: user._id,
-            name: user.name,
-            email: user.email,
-            role: user.role,
-          },
-        },
+        data: { user },
       });
     } catch (error) {
       next(error);
@@ -33,125 +34,118 @@ export class UserController {
   login = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { email, password } = req.body;
-      if (!email || !password) {
+      const { user, token } = await this.userService.login(email, password);
+      res.status(HTTP_STATUS.OK).json({
+        status: 'success',
+        data: { user, token },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getProfile = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!req.user?.id) {
         throw new AppError(
-          ErrorType.VALIDATION,
-          ErrorModule.USER,
-          ErrorMessages[ErrorModule.USER][ErrorType.VALIDATION]!.INVALID_CREDENTIALS,
-          400,
-          { module: ErrorModule.USER, method: 'login' }
+          ErrorType.AUTHENTICATION,
+          ErrorModule.AUTH,
+          ErrorMessages[ErrorModule.AUTH][ErrorType.AUTHENTICATION]!.UNAUTHORIZED,
+          HTTP_STATUS.UNAUTHORIZED,
+          { module: ErrorModule.AUTH, method: 'getProfile' }
         );
       }
-
-      const { user, token } = await this.userService.login(email, password);
-      res.status(200).json({
-        status: 'success',
-        data: {
-          user: {
-            id: user._id,
-            name: user.name,
-            email: user.email,
-            role: user.role,
-          },
-          token,
-        },
-      });
-    } catch (error) {
-      next(error);
-    }
-  };
-
-  getProfile = async (
-    req: AuthenticatedRequest,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> => {
-    try {
       const user = await this.userService.findUserById(req.user.id);
-      res.status(200).json({
+      res.status(HTTP_STATUS.OK).json({
         status: 'success',
-        data: {
-          user: {
-            id: user._id,
-            name: user.name,
-            email: user.email,
-            role: user.role,
-          },
-        },
+        data: { user },
       });
     } catch (error) {
       next(error);
     }
   };
 
-  updateProfile = async (
-    req: AuthenticatedRequest,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> => {
+  updateProfile = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
+      if (!req.user?.id) {
+        throw new AppError(
+          ErrorType.AUTHENTICATION,
+          ErrorModule.AUTH,
+          ErrorMessages[ErrorModule.AUTH][ErrorType.AUTHENTICATION]!.UNAUTHORIZED,
+          HTTP_STATUS.UNAUTHORIZED,
+          { module: ErrorModule.AUTH, method: 'updateProfile' }
+        );
+      }
       const user = await this.userService.updateUser(req.user.id, req.body);
-      res.status(200).json({
+      res.status(HTTP_STATUS.OK).json({
         status: 'success',
-        data: {
-          user: {
-            id: user._id,
-            name: user.name,
-            email: user.email,
-            role: user.role,
-          },
-        },
+        data: { user },
       });
     } catch (error) {
       next(error);
     }
   };
 
-  deleteProfile = async (
-    req: AuthenticatedRequest,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> => {
+  updateSettings = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
-      await this.userService.deleteUser(req.user.id);
-      res.status(204).json({
+      if (!req.user?.id) {
+        throw new AppError(
+          ErrorType.AUTHENTICATION,
+          ErrorModule.AUTH,
+          ErrorMessages[ErrorModule.AUTH][ErrorType.AUTHENTICATION]!.UNAUTHORIZED,
+          HTTP_STATUS.UNAUTHORIZED,
+          { module: ErrorModule.AUTH, method: 'updateSettings' }
+        );
+      }
+      const { settings } = req.body;
+      const user = await this.userService.updateUserSettings(req.user.id, settings);
+      res.status(HTTP_STATUS.OK).json({
         status: 'success',
-        data: null,
+        data: { user },
       });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  deleteProfile = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!req.user?.id) {
+        throw new AppError(
+          ErrorType.AUTHENTICATION,
+          ErrorModule.AUTH,
+          ErrorMessages[ErrorModule.AUTH][ErrorType.AUTHENTICATION]!.UNAUTHORIZED,
+          HTTP_STATUS.UNAUTHORIZED,
+          { module: ErrorModule.AUTH, method: 'deleteProfile' }
+        );
+      }
+      await this.userService.deleteUser(req.user.id);
+      res.status(HTTP_STATUS.NO_CONTENT).send();
     } catch (error) {
       next(error);
     }
   };
 
   getSettings = async (
-    req: AuthenticatedRequest,
+    req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> => {
     try {
+      if (!req.user?.id) {
+        throw new AppError(
+          ErrorType.AUTHENTICATION,
+          ErrorModule.AUTH,
+          ErrorMessages[ErrorModule.AUTH][ErrorType.AUTHENTICATION]!.INVALID_TOKEN,
+          HTTP_STATUS.UNAUTHORIZED,
+          { module: ErrorModule.AUTH, method: 'getSettings' }
+        );
+      }
       const user = await this.userService.findUserById(req.user.id);
-      res.status(200).json({
+      res.status(HTTP_STATUS.OK).json({
         status: 'success',
         data: {
           settings: user.settings || {},
-        },
-      });
-    } catch (error) {
-      next(error);
-    }
-  };
-
-  updateSettings = async (
-    req: AuthenticatedRequest,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> => {
-    try {
-      const user = await this.userService.updateUserSettings(req.user.id, req.body);
-      res.status(200).json({
-        status: 'success',
-        data: {
-          settings: user.settings,
         },
       });
     } catch (error) {

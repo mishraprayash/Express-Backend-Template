@@ -4,73 +4,78 @@ import { config } from '../../config';
 import { AppError } from '../errors/AppError';
 import { ErrorType, ErrorModule, ErrorMessages } from '../errors/errorTypes';
 import { UserService } from '../../modules/users/services/user.service';
+import { HTTP_STATUS } from '../constants/httpStatus';
+import { AuthenticatedRequest } from '../types/express';
 
-export interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    email: string;
-    role: string;
-  };
-}
-
-export const authMiddleware = async (
+export const authenticate = async (
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
-    // 1) Get token from header
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
       throw new AppError(
         ErrorType.AUTHENTICATION,
         ErrorModule.AUTH,
-        ErrorMessages[ErrorModule.AUTH][ErrorType.AUTHENTICATION]!.INVALID_TOKEN,
-        401,
-        { module: ErrorModule.AUTH, method: 'authMiddleware' }
+        ErrorMessages[ErrorModule.AUTH][ErrorType.AUTHENTICATION]!.NO_TOKEN,
+        HTTP_STATUS.UNAUTHORIZED,
+        { module: ErrorModule.AUTH, method: 'authenticate' }
       );
     }
 
     const token = authHeader.split(' ')[1];
+    if (!token) {
+      throw new AppError(
+        ErrorType.AUTHENTICATION,
+        ErrorModule.AUTH,
+        ErrorMessages[ErrorModule.AUTH][ErrorType.AUTHENTICATION]!.INVALID_TOKEN,
+        HTTP_STATUS.UNAUTHORIZED,
+        { module: ErrorModule.AUTH, method: 'authenticate' }
+      );
+    }
 
-    // 2) Verify token
-    const decoded = jwt.verify(token, config.jwt.secret) as {
-      id: string;
-      email: string;
-      role: string;
-    };
+    try {
+      const decoded = jwt.verify(token, config.jwt.secret) as {
+        id: string;
+        email: string;
+        role: string;
+      };
 
-    // 3) Check if user still exists
-    const userService = new UserService();
-    await userService.findUserById(decoded.id);
-
-    // 4) Grant access to protected route
-    (req as AuthenticatedRequest).user = decoded;
-    next();
-  } catch (error) {
-    if (error instanceof jwt.JsonWebTokenError) {
-      next(
-        new AppError(
+      const userService = new UserService();
+      const user = await userService.findUserById(decoded.id);
+      
+      if (!user) {
+        throw new AppError(
           ErrorType.AUTHENTICATION,
           ErrorModule.AUTH,
           ErrorMessages[ErrorModule.AUTH][ErrorType.AUTHENTICATION]!.INVALID_TOKEN,
-          401,
-          { module: ErrorModule.AUTH, method: 'authMiddleware' }
-        )
-      );
-    } else if (error instanceof jwt.TokenExpiredError) {
-      next(
-        new AppError(
+          HTTP_STATUS.UNAUTHORIZED,
+          { module: ErrorModule.AUTH, method: 'authenticate' }
+        );
+      }
+
+      (req as AuthenticatedRequest).user = {
+        id: decoded.id,
+        email: decoded.email,
+        role: decoded.role,
+      };
+
+      next();
+    } catch (error) {
+      if (error instanceof jwt.JsonWebTokenError) {
+        throw new AppError(
           ErrorType.AUTHENTICATION,
           ErrorModule.AUTH,
-          ErrorMessages[ErrorModule.AUTH][ErrorType.AUTHENTICATION]!.TOKEN_EXPIRED,
-          401,
-          { module: ErrorModule.AUTH, method: 'authMiddleware' }
-        )
-      );
-    } else {
-      next(error);
+          ErrorMessages[ErrorModule.AUTH][ErrorType.AUTHENTICATION]!.INVALID_TOKEN,
+          HTTP_STATUS.UNAUTHORIZED,
+          { module: ErrorModule.AUTH, method: 'authenticate' }
+        );
+      }
+      throw error;
     }
+  } catch (error) {
+    next(error);
   }
 };
 
@@ -83,7 +88,7 @@ export const restrictTo = (...roles: string[]) => {
           ErrorType.AUTHENTICATION,
           ErrorModule.AUTH,
           ErrorMessages[ErrorModule.AUTH][ErrorType.AUTHENTICATION]!.INVALID_TOKEN,
-          401,
+          HTTP_STATUS.UNAUTHORIZED,
           { module: ErrorModule.AUTH, method: 'restrictTo' }
         )
       );
@@ -95,7 +100,7 @@ export const restrictTo = (...roles: string[]) => {
           ErrorType.AUTHORIZATION,
           ErrorModule.AUTH,
           ErrorMessages[ErrorModule.AUTH][ErrorType.AUTHORIZATION]!.UNAUTHORIZED,
-          403,
+          HTTP_STATUS.FORBIDDEN,
           { module: ErrorModule.AUTH, method: 'restrictTo' }
         )
       );

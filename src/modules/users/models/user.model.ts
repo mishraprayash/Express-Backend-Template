@@ -2,24 +2,16 @@ import mongoose, { Document, Schema } from 'mongoose';
 import bcrypt from 'bcryptjs';
 import { AppError } from '../../../shared/errors/AppError';
 import { ErrorType, ErrorModule, ErrorMessages } from '../../../shared/errors/errorTypes';
+import { HTTP_STATUS } from '../../../shared/constants/httpStatus';
 
 export interface IUser extends Document {
-  _id: mongoose.Types.ObjectId;
   email: string;
   password: string;
-  name: string;
-  role: 'user' | 'admin';
-  isEmailVerified: boolean;
-  isModified(path: string): boolean;
+  firstName: string;
+  lastName: string;
+  role: string;
+  settings: Map<string, any>;
   comparePassword(candidatePassword: string): Promise<boolean>;
-  settings?: {
-    theme?: string;
-    notifications?: boolean;
-    language?: string;
-    [key: string]: string | boolean | undefined;
-  };
-  createdAt: Date;
-  updatedAt: Date;
 }
 
 const userSchema = new Schema<IUser>(
@@ -28,17 +20,24 @@ const userSchema = new Schema<IUser>(
       type: String,
       required: [true, 'Email is required'],
       unique: true,
-      trim: true,
       lowercase: true,
+      trim: true,
+      match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email address'],
     },
     password: {
       type: String,
       required: [true, 'Password is required'],
-      minlength: [6, 'Password must be at least 6 characters long'],
+      minlength: [8, 'Password must be at least 8 characters long'],
+      select: false,
     },
-    name: {
+    firstName: {
       type: String,
-      required: [true, 'Name is required'],
+      required: [true, 'First name is required'],
+      trim: true,
+    },
+    lastName: {
+      type: String,
+      required: [true, 'Last name is required'],
       trim: true,
     },
     role: {
@@ -46,61 +45,56 @@ const userSchema = new Schema<IUser>(
       enum: ['user', 'admin'],
       default: 'user',
     },
-    isEmailVerified: {
-      type: Boolean,
-      default: false,
-    },
     settings: {
       type: Map,
-      of: mongoose.Schema.Types.Mixed,
+      of: Schema.Types.Mixed,
+      default: () => new Map(),
     },
   },
   {
     timestamps: true,
+    toJSON: {
+      transform: (_, ret) => {
+        delete ret.password;
+        if (ret.settings instanceof Map) {
+          ret.settings = Object.fromEntries(ret.settings);
+        } else if (ret.settings && typeof ret.settings === 'object') {
+          ret.settings = Object.fromEntries(new Map(Object.entries(ret.settings)));
+        }
+        return ret;
+      },
+    },
+    toObject: {
+      transform: (_, ret) => {
+        delete ret.password;
+        if (ret.settings instanceof Map) {
+          ret.settings = Object.fromEntries(ret.settings);
+        } else if (ret.settings && typeof ret.settings === 'object') {
+          ret.settings = Object.fromEntries(new Map(Object.entries(ret.settings)));
+        }
+        return ret;
+      },
+    },
   }
 );
 
-// Hash password before saving
-userSchema.pre(
-  'save',
-  async function (this: IUser, next: mongoose.CallbackWithoutResultAndOptionalError) {
-    if (!this.isModified('password')) return next();
+userSchema.pre('save', async function (next) {
+  if (!this.isModified('password')) return next();
 
-    try {
-      const salt = await bcrypt.genSalt(10);
-      this.password = await bcrypt.hash(this.password, salt);
-      next();
-    } catch (error) {
-      next(
-        new AppError(
-          ErrorType.INTERNAL,
-          ErrorModule.DATABASE,
-          ErrorMessages[ErrorModule.DATABASE][ErrorType.INTERNAL]!.QUERY_ERROR,
-          500,
-          { module: ErrorModule.DATABASE, method: 'hashPassword' },
-          { error: (error as Error).message }
-        )
-      );
-    }
+  try {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (error) {
+    next(error as Error);
   }
-);
+});
 
-// Method to compare password
-userSchema.methods.comparePassword = async function (
-  this: IUser,
-  candidatePassword: string
-): Promise<boolean> {
+userSchema.methods.comparePassword = async function (candidatePassword: string): Promise<boolean> {
   try {
     return await bcrypt.compare(candidatePassword, this.password);
   } catch (error) {
-    throw new AppError(
-      ErrorType.INTERNAL,
-      ErrorModule.DATABASE,
-      ErrorMessages[ErrorModule.DATABASE][ErrorType.INTERNAL]!.QUERY_ERROR,
-      500,
-      { module: ErrorModule.DATABASE, method: 'comparePassword' },
-      { error: (error as Error).message }
-    );
+    throw error;
   }
 };
 

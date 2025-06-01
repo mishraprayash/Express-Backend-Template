@@ -2,8 +2,12 @@ import dotenv from 'dotenv';
 import { z } from 'zod';
 import { AppError } from '../shared/errors/AppError';
 import { ErrorType, ErrorModule, ErrorMessages } from '../shared/errors/errorTypes';
+import { HTTP_STATUS } from '../shared/constants/httpStatus';
+import path from 'path';
 
-dotenv.config();
+// Load environment variables based on NODE_ENV
+const envFile = process.env.NODE_ENV === 'test' ? '.env.test' : '.env';
+dotenv.config({ path: path.resolve(process.cwd(), envFile) });
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -31,6 +35,9 @@ let config: {
     port: number;
     password?: string;
   };
+  mongo: {
+    uri: string;
+  };
 };
 
 try {
@@ -50,6 +57,9 @@ try {
       port: parseInt(env.REDIS_PORT, 10),
       password: env.REDIS_PASSWORD,
     },
+    mongo: {
+      uri: env.DATABASE_URL,
+    },
   };
 } catch (error) {
   if (error instanceof z.ZodError) {
@@ -58,7 +68,7 @@ try {
       ErrorType.VALIDATION,
       ErrorModule.SYSTEM,
       ErrorMessages[ErrorModule.SYSTEM][ErrorType.VALIDATION]!.INVALID_CONFIG,
-      500,
+      HTTP_STATUS.INTERNAL_SERVER_ERROR,
       { module: ErrorModule.SYSTEM, method: 'config' },
       { details: messages }
     );

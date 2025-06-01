@@ -1,29 +1,38 @@
 import { z } from 'zod';
 
-const baseUserSchema = z.object({
-  email: z.string().email('Please provide a valid email'),
-  name: z.string().min(2, 'Name must be at least 2 characters long'),
+const userSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(8, 'Password must be at least 8 characters long'),
+  firstName: z.string().min(1, 'First name is required'),
+  lastName: z.string().min(1, 'Last name is required'),
 });
+
+const settingsSchema = z.record(z.union([z.string(), z.boolean(), z.undefined()]));
 
 export const userValidation = {
   register: z.object({
-    body: baseUserSchema.extend({
-      password: z.string().min(6, 'Password must be at least 6 characters long'),
-    }),
+    body: userSchema,
   }),
 
   login: z.object({
     body: z.object({
-      email: z.string().email('Please provide a valid email'),
+      email: z.string().email('Invalid email address'),
       password: z.string().min(1, 'Password is required'),
     }),
   }),
 
   updateProfile: z.object({
-    body: baseUserSchema
-      .extend({
-        password: z.string().min(6, 'Password must be at least 6 characters long').optional(),
-      })
-      .partial(),
+    body: z.object({
+      email: z.string().email('Invalid email address').optional(),
+      password: z.string().min(8, 'Password must be at least 8 characters long').optional(),
+      firstName: z.string().min(1, 'First name is required').optional(),
+      lastName: z.string().min(1, 'Last name is required').optional(),
+    }),
+  }),
+
+  updateSettings: z.object({
+    body: z.object({
+      settings: settingsSchema,
+    }),
   }),
 };
