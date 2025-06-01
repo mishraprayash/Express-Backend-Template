@@ -78,6 +78,10 @@ src/
   - Database connection
   - Server startup logic
   - Graceful shutdown handling
+  - Enhanced error handling (unhandledRejection, uncaughtException)
+  - Graceful shutdown with timeout
+  - Proper cleanup of all connections
+  - Process signal handling (SIGTERM, SIGINT)
 
 ## Getting Started
 
@@ -140,6 +144,13 @@ src/
 ## Error Handling
 
 The application uses a centralized error handling mechanism. All errors are processed through the error handling middleware in `app.ts`.
+
+The server implements comprehensive error handling:
+- Unhandled promise rejections
+- Uncaught exceptions
+- Server errors
+- Graceful shutdown with connection cleanup
+- Forceful shutdown after timeout (10 seconds)
 
 ## Authentication
 
